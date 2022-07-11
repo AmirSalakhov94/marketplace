@@ -4,6 +4,7 @@ pragma solidity ^0.8.15;
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./U1155.sol";
+import "./ERC20.sol";
 
 contract Marketplace {
 
@@ -11,46 +12,57 @@ contract Marketplace {
     Counters.Counter private _itemCounter;
 
     struct Item {
-        uint256 itemId;
-        address nftAddress;
         uint256 tokenId;
-        address payable seller;
-        address payable owner;
+        address seller;
+        address owner;
+        uint256 amount;
         uint256 price;
     }
 
-    address[] private createdTokens;
     mapping(uint256 => Item) private items;
     address private _owner;
+    address private _erc1155;
+    address private _erc20;
 
-    constructor() {
+    constructor(address erc1155_, address erc20_) {
         _itemCounter = 0;
         _owner = msg.sender;
+        _erc1155 = erc1155_;
+        _erc20 = erc20_;
     }
 
-    function createItem(address _owner, string memory _uri, uint256 _amount) public {
-        const token1155 = new U1155(_owner, _uri, _amount);
-        createdTokens.push(token1155);
+    function createItem(address owner, string memory uri, uint256 amount) public {
+        U1155(_erc1155).mint(owner, amount, uri);
     }
 
-    function listItem(address _nftAddress, uint256 _tokenId, uint256 _amount, uint256 _price) public payable {
+    function listItem(uint256 tokenId, uint256 amount, uint256 price) public {
         items[_itemCounter.current()] = Item(
-            _itemCounter.current(),
-            _nftAddress,
-            _tokenId,
-            payable(msg.sender),
-            payable(address(this)),
-            _price);
+            tokenId,
+            msg.sender,
+            address(this),
+            amount,
+            price);
 
-        U1155(_nftAddress).safeTransferFrom(msg.sender, address(this), _tokenId, _amount, 0x00);
+        U1155(_erc1155).safeTransferFrom(msg.sender, address(this), tokenId, amount, 0x00);
 
         _itemCounter.increment();
     }
 
-    function buyItem(uint256 _tokenId) public payable {
-        items[_tokenId]
-        items[_tokenId].owner = payable(msg.sender);
+    function cancel(uint256 itemId) public {
+        require(msg.sender == items[itemId].seller, "Access denied");
 
-        U1155(items[_tokenId].nftAddress).safeTransferFrom(address(this), msg.sender, )
+        U1155(_erc1155).safeTransferFrom(address(this), msg.sender, tokenId, amount, 0x00);
+
+        delete items[itemId];
+    }
+
+    function buyItem(uint256 itemId) public {
+        Item item = items[itemId];
+        require(ERC20(_erc20).allowance(msg.sender, address(this)) >= item.price, "Marketplace dont have allowance");
+
+        ERC20(_erc20).transferFrom(msg.sender, item.seller, item.price);
+
+        U1155(_erc1155).safeTransferFrom(address(this), msg.sender, item.tokenId, item.amount, 0x00);
+        delete items[itemId];
     }
 }

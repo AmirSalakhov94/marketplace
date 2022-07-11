@@ -17,7 +17,7 @@ contract U1155 is ERC1155 {
         mint(msg.sender, _tokenIds.current(), _amount, _uri);
     }
 
-    function mint(address _to, uint256 _amount, string memory _uri) public view virtual returns  {
+    function mint(address _to, uint256 _amount, string memory _uri) public {
         _tokenIds.increment();
         _mint(_to, _tokenIds.current(), _amount, "");
         idToUri[_id] = _uri;
